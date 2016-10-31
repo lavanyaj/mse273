@@ -39,9 +39,17 @@ def complete_row(row):
 #     print simplejson.dumps(result)
 #     return 0
     
-def parse_to_csv(filename="tmp-lb.txt"):
+def parse_to_csv(filename="tmp-lb.txt", header=False):
     f = open(filename, "r")
 
+    download_date = ""
+    download_date_pattern = re.compile("123load.Oct(\d+).*")
+    arr = download_date_pattern.findall(filename)
+    if len(arr) > 0:
+        download_date = "10/%s"%arr[0]
+
+    #print "download date is " + download_date
+    
     origins = {}
     dests = {}
     
@@ -53,24 +61,26 @@ def parse_to_csv(filename="tmp-lb.txt"):
 
     sorted_new_keys = sorted(new_keys.keys())
     sorted_pattern_keys = sorted(patterns.keys())
-    
-    # print header- new keys followed by existing
-    for key in sorted_new_keys:
-        print (key + ","),
 
-    for key in sorted_pattern_keys:
-        print key + ",",
-    print ""
+    if (header):
+        # print header- new keys followed by existing
+        for key in sorted_new_keys:
+            print (key + ","),
+
+        for key in sorted_pattern_keys:
+            print key + ",",
+        print "i_download-date,",
+        print ""
 
     for line in f.readlines():
         if make_new_line(line) and complete_row(last_row):
             # print new keys (when valid)
             origin = ",".join([last_row["a_origin-city"],\
                                   last_row["b_origin-state"]])
-            dest = ",".join([last_row["a_dest-city"],\
-                                   last_row["b_dest-state"]])
-            origins[upper(origin)] = True
-            dests[upper(dest)] = True
+            dest = ",".join([last_row["c_dest-city"],\
+                                   last_row["d_dest-state"]])
+            origins[str.upper(origin)] = True
+            dests[str.upper(dest)] = True
             for key in sorted_new_keys:
                 subkeys = new_keys[key]
                 valid = all([subkey in last_row for subkey in subkeys])
@@ -86,6 +96,7 @@ def parse_to_csv(filename="tmp-lb.txt"):
                     value = last_row[key]
                 print (value + ","),
                 # end for key in sorted_pattern
+            print (download_date + ","),
             print ""
             last_row = {}
             # end if make_new_line
@@ -96,19 +107,28 @@ def parse_to_csv(filename="tmp-lb.txt"):
             if len(arr) > 0:
                 last_row[key] = str(arr[0])
                 if "div" in str(arr[0]):
-                    print line + ": searching for " + key + ": found " + str(arr[0])
+                    print line + ": searching for " \
+                        + key + ": found " + str(arr[0])                
+                    # end
+             # end
+        # end
+    # end
+# end
+
+
                     # end if "div"
                     # end if len(arr) > 0
                     # end for key in sorted_pattern
                     # end for line in ..
 
-        print "pairwise distances"
-        for origin in sorted(origins.keys()):
-            for dest in sorted(dests.keys()):
-                print "%s, %s" % (origin, dest)
-                print "%s, %s" % (dest, origin)
+#         print "pairwise distances"
+#         for origin in sorted(origins.keys()):
+#             for dest in sorted(dests.keys()):
+#                 print "%s, %s" % (origin, dest)
+#                 print "%s, %s" % (dest, origin)
 # https://maps.googleapis.com/maps/api/distancematrix/json?origins=Vancouver+BC&destinations=San+Francisco&mode=driving        
 #f = open("123load_Oct22.txt", "r")
+
 parse_to_csv(sys.argv[1]) #"123load_Oct22.txt")
 
 #get_time("Delhi, India", "Bangalore, India")
