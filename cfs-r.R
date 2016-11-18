@@ -1,6 +1,9 @@
 library(data.table)
-cfs <- fread("~/Downloads/cfs_2012_pumf_csv.txt")
-
+cfs <- fread("~/mse273/cfs_2012_pumf_csv.txt")
+naics <- fread("~/mse273/naics.txt")
+cfs_area <- fread("~/mse273/cfs_area.txt")
+cfs_orig <- cfs_area
+cfs_dest <- cfs_area
 # round shipment weight to tons
 cfs$SHIPMT_WGHT <- round(cfs$SHIPMT_WGHT/1000)
 # round routed distance to hundreds of miles
@@ -12,7 +15,9 @@ cfs$SHIPMT_DIST_ROUTED <- round(cfs$SHIPMT_DIST_ROUTED/100)
 # (MODE==3 | MODE==4 | MODE==5)]
 # not oil and gas 
 # !(SCTG >= 15 & SCTG <= 19)
-nonpetro_cfs <- cfs[EXPORT_YN=='N' & (MODE==3 | MODE==4 | MODE==5) & !(SCTG >= 15 & SCTG <= 19) & HAZMAT=='N']
+shipments <- cfs[EXPORT_YN=='N' & (MODE==3 | MODE==4 | MODE==5) & !(SCTG >= 15 & SCTG <= 19) & HAZMAT=='N']
+
+setkey
 
 shipments_by_industry <- nonpetro_cfs[,sum(WGT_FACTOR), by=NAICS]
 setkey(shipments_by_industry,V1)

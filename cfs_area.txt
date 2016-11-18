@@ -130,4 +130,3 @@
 99999 54 54-99999 R Remainder of West Virginia CFS Area
 99999 55 55-99999 R Remainder of Wisconsin CFS Area
 99999 56 56-99999 R Remainder of Wyoming CFS Area
-
