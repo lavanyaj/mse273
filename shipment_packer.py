@@ -29,9 +29,9 @@ class ShipmentPacker:
         packer = GreedyPacker()
         packing_list = packer.getPacking(sizes, bin_size)
 
-        print ("shipment sizes " + str(sizes) +\
-                   " packed like " +\
-                   str(packing_list))
+        #print ("shipment sizes " + str(sizes) +\
+        #           " packed like " +\
+        #           str(packing_list))
         
         truck_list = []
         for packing in packing_list:

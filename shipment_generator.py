@@ -28,6 +28,7 @@ class ShipmentGenerator:
 
 class Pdf:
     def __init__(self, pdfFile=None):
+        self.epsilon = 1e-6
         self.cdf = []
         self.values = []
         if pdfFile is not None:
@@ -40,7 +41,8 @@ class Pdf:
                 cdf += pdf
                 self.cdf.append(cdf)
                 self.values.append(val)
-            assert(cdf == 1)
+            assert(cdf >= 1 - self.epsilon)
+            assert(cdf <= 1 + self.epsilon)
         return
     
     def getNext(self, u):
