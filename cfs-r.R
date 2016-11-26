@@ -17,15 +17,15 @@ add_labels <- function(test) {
 	setkey(test, ORIG_CFS_AREA)
 	setkey(cfs_area, V1)
 	test <- test[cfs_area,nomatch=0]
-	rename(test, c("V2"="ORIG_CFS_AREA_STR"))
+	test <- rename(test, c("V2"="ORIG_CFS_AREA_STR"))
 	setkey(test, DEST_CFS_AREA)
 	test <- test[cfs_area,nomatch=0]
-	rename(test, c("V2"="DEST_CFS_AREA_STR"))
+	test <- rename(test, c("V2"="DEST_CFS_AREA_STR"))
 	naics <- fread("~/mse273/naics.txt", sep=":", header=FALSE)
 	setkey(naics, V1)
 	setkey(test, NAICS)
 	test <- test[naics,nomatch=0]
-	rename(test, c("V2"="NAICS_STR"))
+	test <- rename(test, c("V2"="NAICS_STR"))
 	test
 }
 
@@ -39,7 +39,7 @@ top_industries_by_num <- function(test) {
 # top industries by tons of shipments
 top_industries_by_tons <- function(test) {
 	result <- test[,sum(WGT_FACTOR*SHIPMT_WGHT), by=NAICS_STR]
-	setkey(result, V2)
+	setkey(result, V1)
 	result
 }
 
@@ -98,7 +98,11 @@ num_by_col <- function(data, col) {
 tons_by_col <- function(data, col) {
  data[,sum(WGT_FACTOR*SHIPMT_WGHT), by=col]
  }
- 
+
+lanes_between <- function(data, low, high) {
+	data[(SHIPMT_DIST_ROUTED > low & SHIPMT_DIST_ROUTED <= high)]
+} 
+
 long_lanes <- function(data) {
  	data[(SHIPMT_DIST_ROUTED > 10 & SHIPMT_DIST_ROUTED <= 30)]
  }
@@ -152,22 +156,61 @@ cat("\nTop industries by ton-miles:\n")
 r1 <- top_industries_by_ton_miles(labeled_shipments)
 r1
 
-cat("\nTop long lanes (1000-3000 mi) by tons:\n")
-r2 <- long_lanes(labeled_shipments)
-r3 <- top_lanes_by_tons(r2)
-r3
-cat("\nTop medium lanes (1000-3000 mi) by tons:\n")
-r2 <- medium_lanes(labeled_shipments)
-r3 <- top_lanes_by_tons(r2)
-r3
+min_distance_list <- c(2,6,10)
+max_distance_list <- c(6, 10, 30)
+distances <- data.frame(x=min_distance_list, y=max_distance_list)
+num_distances <- dim(distances)[1]
 
-cat("\nShipment size distribution (by number):\n ")
-p <- pdf_num_by_col(shipments, 'SHIPMT_WGHT')
-p
+for (distance_type in c(1:num_distances)) { 
+	min_distance <- distances[distance_type,1]
+	max_distance <- distances[distance_type,2]
 
-cat("\nShipment size distribution (by tons):\n")
-p <- pdf_tons_by_col(shipments, 'SHIPMT_WGHT')
-p
+	cat("\nTop (", min_distance*100, "-", max_distance*100, " mi) lanes by tons:\n")
+	long_lanes_shipments <- lanes_between(labeled_shipments, min_distance, max_distance)
+	top_long_lanes <- top_lanes_by_tons(long_lanes_shipments)
+	top_long_lanes <- rename(top_long_lanes, c("V1"="TONS"))
+	num_long_lanes <- dim(top_long_lanes)[1]
+	topx <- min(num_long_lanes,10)
+	print(top_long_lanes[(num_long_lanes):(num_long_lanes-topx),])
+
+	# shipments in lane1
+	for (index in c(0:topx)) {
+	cat("\nTop (", min_distance*100, "-", max_distance*100, " mi) lane #", index, " by tons:\n")
+	lane <- top_long_lanes[num_long_lanes-index,]
+	tons_forward <- lane[1,TONS]
+	print(lane[1,])
+	setkey(lane,ORIG_CFS_AREA_STR,DEST_CFS_AREA_STR )
+	setkey(labeled_shipments, ORIG_CFS_AREA_STR,DEST_CFS_AREA_STR)
+	lane_shipments <- labeled_shipments[lane]
+
+	sample_distance <- lane_shipments[1,SHIPMT_DIST_ROUTED]
+
+	# reverse lane characteristics
+	cat("\nTons of shipments on reverse lane #", index)
+	lane_reverse <- labeled_shipments[DEST_CFS_AREA_STR==(lane[1,ORIG_CFS_AREA_STR]
+			) & ORIG_CFS_AREA_STR==(lane[1,DEST_CFS_AREA_STR])]
+	tons_reverse <- total_tons_shipments(lane_reverse)
+
+	sample_reverse_distance <- lane_reverse[1,SHIPMT_DIST_ROUTED]
+	ratio <- round(tons_reverse*100/tons_forward)
+	cat("\nTons forward ", tons_forward, " (" , sample_distance*100, "mi) and tons reverse ", 
+		tons_reverse, " (" , sample_distance*100, "mi) ratio ", ratio, " %\n")
+
+	if (ratio > 50 & ratio < (100)) {
+	# top industries by tons in lane1
+	cat("\nTop 5 industries in lane #", index)
+	top_industries_in_lane <- top_industries_by_tons(lane_shipments)
+	num_industries <- dim(top_industries_in_lane)[1]
+	topx <- min(num_industries,5)
+	print(top_industries_in_lane[(num_industries):(num_industries-topx),])
+
+	# size distribution
+	cat("\nSize distribution (by number) in lane #", index)
+	p <- pdf_num_by_col(lane_shipments, 'SHIPMT_WGHT')
+	print(p)
+	}
+}
+}
 
 cat("\nNumber of long lanes (1000-3000 mi) that are heavy enough (10% of best): XX\n")
 cat("\nNumber of medium lanes (600-1000 mi) that are heavy enough (10% of best): XX")
