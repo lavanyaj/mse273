@@ -23,7 +23,12 @@ class ShipmentGenerator:
 
     def getShipment(self):
         u = random.random()
-        return Shipment(self.origin, self.dest, self.weight_pdf.getNext(u),\
+        weight = self.weight_pdf.getNext(u)
+        while weight > 15:
+            u = random.random()
+            weight = self.weight_pdf.getNext(u)
+        #print u, " ", weight
+        return Shipment(self.origin, self.dest, weight,\
                             self.day, self.time_of_day)
 
 class Pdf:
