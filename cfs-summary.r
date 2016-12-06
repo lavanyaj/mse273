@@ -112,7 +112,7 @@ is_long_lane <- function(distance) {
  	#data[(SHIPMT_DIST_ROUTED > 6 & SHIPMT_DIST_ROUTED <= 10)]
  }
  is_short_lane <- function(distance) {
- 	distance > 2 & distance <= 10
+ 	distance > 2 & distance <= 6
  	#data[(SHIPMT_DIST_ROUTED > 2 & SHIPMT_DIST_ROUTED <= 6)]
  }
  light_shipments <- function(data) {
@@ -144,7 +144,7 @@ cat("\nTotal tons of shipments: ")
 total_tons_shipments(cfs)
 
 # filter out LTL
-shipments <- cfs[EXPORT_YN=='N' & (MODE==3 | MODE==4 | MODE==5) & !(SCTG >= 15 & SCTG <= 19) & HAZMAT=='N' & (SHIPMT_WGHT > 5 & SHIPMT_WGHT <= 20) & (SHIPMT_DIST_ROUTED > 2 & SHIPMT_DIST_ROUTED <= 30)]
+shipments <- cfs[EXPORT_YN=='N' & (MODE==3 | MODE==4 | MODE==5) & !(SCTG >= 15 & SCTG <= 19) & HAZMAT=='N' & (SHIPMT_WGHT > 3 & SHIPMT_WGHT <= 15) & (SHIPMT_DIST_ROUTED > 2 & SHIPMT_DIST_ROUTED <= 30)]
 # & (ORIG_CFS_AREA != DEST_CFS_AREA)]
 
 cat("\nLTL shipment data")
@@ -176,6 +176,8 @@ num_distances <- dim(distances)[1]
 	one_way_tons = 0
 	short_heavy_tons = 0
 	medium_heavy_tons = 0
+	total_distance_lanes = 0
+	total_num_lanes = 0
 	
 for (distance_type in c(1:num_distances)) { 
 	min_distance <- distances[distance_type,1]
@@ -188,7 +190,7 @@ for (distance_type in c(1:num_distances)) {
 	
 	
 	#topx <- min(num_long_lanes,20)
-	heavy_lanes <- top_long_lanes[TONS > 150000]
+	heavy_lanes <- top_long_lanes[TONS > 125000]
 	num_long_lanes <- dim(heavy_lanes)[1]
 
 
@@ -203,37 +205,53 @@ for (distance_type in c(1:num_distances)) {
  	lane_reverse <- labeled_shipments[DEST_CFS_AREA_STR==(lane[1,ORIG_CFS_AREA_STR]
  			) & ORIG_CFS_AREA_STR==(lane[1,DEST_CFS_AREA_STR])]
  	tons_reverse <- total_tons_shipments(lane_reverse)
- 	
+ 	num_forward <- total_num_shipments(lane_shipments)
+	num_reverse <- total_num_shipments(lane_reverse)
+
+	avg_forward = 0
+	avg_reverse = 0
+	if (num_forward > 0) {round(avg_forward = tons_forward/num_forward)}
+	if (num_reverse > 0) {round(avg_reverse = tons_reverse/num_reverse)}
+
  	#{cat("\n weird lane", origin, " ", dest, " ", ratio, " ", tons_forward, " ", sample_distance)}
  	# {cat(tons_forward, " ", tons_reverse, " ", ratio, "\n")}
- 	if (tons_reverse > 0 & tons_forward > 0) {
+ 	kind = "na"
+	if (tons_reverse > 0 & tons_forward > 0) {
  		ratio <- round(tons_reverse*100/tons_forward)
  		if (ratio>50 & ratio<100) { 
+		total_distance_lanes = total_distance_lanes + sample_distance
+		total_num_lanes = total_num_lanes + 1
  		if (is_long_lane(sample_distance)) {
+		        kind = "long"
  			long_lanes = long_lanes + 1
  			long_tons = long_tons + tons_forward+tons_reverse
  			if (tons_forward > 250000) {
+			        kind = "long heavy"
  				long_heavy_tons = long_heavy_tons + tons_forward+tons_reverse
  				long_heavy_lanes = long_heavy_lanes + 1
  				}
  			} else if (is_medium_lane(sample_distance)) {
- 			medium_lanes = medium_lanes + 1
+ 			       	kind = "medium"
+				medium_lanes = medium_lanes + 1
  				medium_tons = medium_tons + tons_forward+tons_reverse
  				if (tons_forward > 250000) {
+				        kind = "medium heavy"
  					medium_heavy_lanes = medium_heavy_lanes + 1	
- 				medium_heavy_tons = medium_heavy_tons + tons_forward+tons_reverse
+ 					medium_heavy_tons = medium_heavy_tons + tons_forward+tons_reverse
  				}
  			} else if (is_short_lane(sample_distance)) {
+			        kind = "short"
  				short_lanes = short_lanes + 1
  				short_tons = short_tons + tons_forward+tons_reverse
  				if (tons_forward > 250000) {
+				 kind = "short heavy"
  					short_heavy_lanes = short_heavy_lanes + 1	
  					short_heavy_tons = short_heavy_tons + tons_forward+tons_reverse
  					}
  				}
  	origin <- lane[1, ORIG_CFS_AREA_STR]
  	dest <- lane[1, DEST_CFS_AREA_STR]
- 	cat("\n", origin, " ", dest, " ", ratio, "% ", tons_forward, " ", tons_reverse, " ", sample_distance*100, " mi")
+ 	cat("\n", sample_distance*100, " mi", origin, " ", dest, " ", ratio, "% ", tons_forward, " ", avg_forward, " ", tons_reverse, " ", avg_reverse, " ", sample_distance*100, " mi",  " ", kind)
  	} else {
  		one_way_tons = one_way_tons + tons_forward+tons_reverse
  	}
@@ -241,6 +259,7 @@ for (distance_type in c(1:num_distances)) {
  }
 }
 
+cat("\nTotal number of lanes ", total_num_lanes, " avg. lane distance ", round(total_distance_lanes/total_num_lanes))
 cat("\nNumber of long lanes (1000-3000 mi) that are heavy (>250K tons /yr):", long_heavy_lanes,"\n")
 cat("\nNumber of medium lanes (600-1000 mi) that are heavy (>250K tons /yr):", medium_heavy_lanes,"\n")
 cat("\nNumber of short lanes (200-600 mi) that are heavy (>250K tons /yr):", short_heavy_lanes,"\n")

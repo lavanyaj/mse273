@@ -170,7 +170,7 @@ for (distance_type in c(1:num_distances)) {
 	top_long_lanes <- top_lanes_by_tons(long_lanes_shipments)
 	top_long_lanes <- rename(top_long_lanes, c("V1"="TONS"))
 	num_long_lanes <- dim(top_long_lanes)[1]
-	topx <- min(num_long_lanes,10)
+	topx <- min(num_long_lanes,20)
 	print(top_long_lanes[(num_long_lanes):(num_long_lanes-topx),])
 
 	# shipments in lane1
