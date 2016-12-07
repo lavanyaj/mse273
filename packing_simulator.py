@@ -26,13 +26,13 @@ def run_once(generator, tons):
         else:
             break
 
-    truck = Truck(20)
+    truck = Truck(40)
 
     packer = ShipmentPacker(truck)
     truck_list = packer.pack(shipment_list)
     total_weight = sum([s.weight for s in shipment_list])
     num_trucks = len(truck_list)
-    average_fill = round((total_weight/(num_trucks * 20))*100)
+    average_fill = round((total_weight/(num_trucks * truck.weight))*100)
     average_shipments = round((len(shipment_list)/(1.0*num_trucks)))
     max_shipments = max([len(t.shipment_list) for t in truck_list])
     return num_trucks, average_fill, average_shipments, max_shipments

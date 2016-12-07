@@ -2,11 +2,19 @@ library(data.table)
 
 options(warn=-1)
 
+MIN_LANE_TONS_PER_YEAR = 62500
+HEAVY_LANE_TONS_PER_YEAR = 125000
+BALANCED_LANE_LOWER = 50
+BALANCED_LANE_UPPER = 100
+LBS_PER_TON = 2000
+MIN_WGHT = 4 
+MAX_WGHT = 15 #15
+
 round_numbers <- function(test) {
 	# round shipment weight to tons
- 	test$SHIPMT_WGHT <- round(test$SHIPMT_WGHT/1000)
+ 	test$SHIPMT_WGHT <- test$SHIPMT_WGHT/LBS_PER_TON
 	# round routed distance to hundreds of miles
-	test$SHIPMT_DIST_ROUTED <- round(test$SHIPMT_DIST_ROUTED/100)
+	test$SHIPMT_DIST_ROUTED <- test$SHIPMT_DIST_ROUTED/100
 	test
 }
 
@@ -133,25 +141,70 @@ total_tons_shipments <- function(data) {
 	data[,sum(WGT_FACTOR*SHIPMT_WGHT)]
 }
 
+total_length_shipments <- function(data) {
+	data[,sum(WGT_FACTOR* SHIPMT_DIST_ROUTED)]
+}
+
 # all shipments
 cfs <- fread("~/mse273/cfs_2012_pumf_csv.txt", header=TRUE)
 cfs <- round_numbers(cfs)
+n<-total_num_shipments(cfs)
+l <- 100 * total_length_shipments(cfs)
+t <- total_tons_shipments(cfs)
 
 cat("Total shipment data")
-cat("\nTotal number of shipments: ")
-total_num_shipments(cfs)
-cat("\nTotal tons of shipments: ")
-total_tons_shipments(cfs)
+cat("\nTotal number of shipments: ", n)
+cat("\n Total tons of shipments: ", t)
+cat("\n Total length of shipments: ", l)
+cat("\nAvg length of shipments: ", (l/n))
+cat("\nAvg weight of shipments: ", (t/n))
+
+parcel_shipments <- cfs[MODE ==14]
+n<-total_num_shipments(parcel_shipments)
+l <- 100 * total_length_shipments(parcel_shipments)
+t <- total_tons_shipments(parcel_shipments)
+
+cat("\nParcel-only shipment data")
+cat("\nTotal number of shipments: ", n)
+cat("\n Total tons of shipments: ", t)
+cat("\n Total length of shipments: ", l)
+cat("\nAvg length of shipments: ", (l/n))
+cat("\nAvg weight of shipments: ", (t/n))
+
+od_shipments <- cfs[(MODE==3 | MODE==4 | MODE==5 | MODE ==14) & !(SCTG >= 15 & SCTG <= 19) & HAZMAT=='N']
+n<-total_num_shipments(od_shipments)
+l <- 100 * total_length_shipments(od_shipments)
+t <- total_tons_shipments(od_shipments)
+cat("\nOld Dominion shipment data")
+cat("\nTotal number of shipments: ", n)
+cat("\n Total tons (2000 lbs) of shipments: ", t)
+cat("\n Total length of shipments: ", l)
+cat("\nAvg length of shipments: ", (l/n))
+cat("\nAvg weight of shipments: ", (t/n))
+
+th_shipments <- cfs[EXPORT_YN=='N' & (MODE==3 | MODE==4 | MODE==5 | MODE ==14) & !(SCTG >= 15 & SCTG <= 19) & HAZMAT=='N']
+n<-total_num_shipments(th_shipments)
+l <- 100 * total_length_shipments(th_shipments)
+t <- total_tons_shipments(th_shipments)
+cat("\n Parcel and Truck, Domestic shipment data")
+cat("\nTotal number of shipments: ", n)
+cat("\n Total tons of shipments: ", t)
+cat("\n Total length of shipments: ", l)
+cat("\nAvg length of shipments: ", (l/n))
+cat("\nAvg weight of shipments: ", (t/n))
 
 # filter out LTL
-shipments <- cfs[EXPORT_YN=='N' & (MODE==3 | MODE==4 | MODE==5) & !(SCTG >= 15 & SCTG <= 19) & HAZMAT=='N' & (SHIPMT_WGHT > 3 & SHIPMT_WGHT <= 15) & (SHIPMT_DIST_ROUTED > 2 & SHIPMT_DIST_ROUTED <= 30)]
+shipments <- cfs[EXPORT_YN=='N' & (MODE==3 | MODE==4 | MODE==5) & !(SCTG >= 15 & SCTG <= 19) & HAZMAT=='N' & (SHIPMT_WGHT > MIN_WGHT & SHIPMT_WGHT <= MAX_WGHT) & (SHIPMT_DIST_ROUTED > 2 & SHIPMT_DIST_ROUTED <= 30)]
 # & (ORIG_CFS_AREA != DEST_CFS_AREA)]
-
+n<-total_num_shipments(shipments)
+l <- 100 * total_length_shipments(shipments)
+t <- total_tons_shipments(shipments)
 cat("\nLTL shipment data")
-cat("\nTotal number of shipments: ")
-total_num_shipments(shipments)
-cat("\nTotal tons of shipments: ")
-total_tons_shipments(shipments)
+cat("\nTotal number of shipments: ", n)
+cat("\n Total tons of shipments: ", t)
+cat("\n Total length of shipments: ", l)
+cat("\nAvg length of shipments: ", (l/n))
+cat("\nAvg weight of shipments: ", (t/n))
 
 labeled_shipments <- add_labels(shipments)
 # top industries by ton*miles
@@ -190,7 +243,7 @@ for (distance_type in c(1:num_distances)) {
 	
 	
 	#topx <- min(num_long_lanes,20)
-	heavy_lanes <- top_long_lanes[TONS > 125000]
+	heavy_lanes <- top_long_lanes[TONS > MIN_LANE_TONS_PER_YEAR]
 	num_long_lanes <- dim(heavy_lanes)[1]
 
 
@@ -210,22 +263,22 @@ for (distance_type in c(1:num_distances)) {
 
 	avg_forward = 0
 	avg_reverse = 0
-	if (num_forward > 0) {round(avg_forward = tons_forward/num_forward)}
-	if (num_reverse > 0) {round(avg_reverse = tons_reverse/num_reverse)}
+	if (num_forward > 0) {avg_forward = (1.0*tons_forward)/num_forward}
+	if (num_reverse > 0) {avg_reverse = (1.0*tons_reverse)/num_reverse}
 
  	#{cat("\n weird lane", origin, " ", dest, " ", ratio, " ", tons_forward, " ", sample_distance)}
  	# {cat(tons_forward, " ", tons_reverse, " ", ratio, "\n")}
  	kind = "na"
 	if (tons_reverse > 0 & tons_forward > 0) {
  		ratio <- round(tons_reverse*100/tons_forward)
- 		if (ratio>50 & ratio<100) { 
+ 		if (ratio> BALANCED_LANE_LOWER & ratio< BALANCED_LANE_UPPER) { 
 		total_distance_lanes = total_distance_lanes + sample_distance
 		total_num_lanes = total_num_lanes + 1
  		if (is_long_lane(sample_distance)) {
 		        kind = "long"
  			long_lanes = long_lanes + 1
  			long_tons = long_tons + tons_forward+tons_reverse
- 			if (tons_forward > 250000) {
+ 			if (tons_forward > HEAVY_LANE_TONS_PER_YEAR) {
 			        kind = "long heavy"
  				long_heavy_tons = long_heavy_tons + tons_forward+tons_reverse
  				long_heavy_lanes = long_heavy_lanes + 1
@@ -234,7 +287,7 @@ for (distance_type in c(1:num_distances)) {
  			       	kind = "medium"
 				medium_lanes = medium_lanes + 1
  				medium_tons = medium_tons + tons_forward+tons_reverse
- 				if (tons_forward > 250000) {
+ 				if (tons_forward > HEAVY_LANE_TONS_PER_YEAR) {
 				        kind = "medium heavy"
  					medium_heavy_lanes = medium_heavy_lanes + 1	
  					medium_heavy_tons = medium_heavy_tons + tons_forward+tons_reverse
@@ -243,7 +296,7 @@ for (distance_type in c(1:num_distances)) {
 			        kind = "short"
  				short_lanes = short_lanes + 1
  				short_tons = short_tons + tons_forward+tons_reverse
- 				if (tons_forward > 250000) {
+ 				if (tons_forward > HEAVY_LANE_TONS_PER_YEAR) {
 				 kind = "short heavy"
  					short_heavy_lanes = short_heavy_lanes + 1	
  					short_heavy_tons = short_heavy_tons + tons_forward+tons_reverse
@@ -260,21 +313,21 @@ for (distance_type in c(1:num_distances)) {
 }
 
 cat("\nTotal number of lanes ", total_num_lanes, " avg. lane distance ", round(total_distance_lanes/total_num_lanes))
-cat("\nNumber of long lanes (1000-3000 mi) that are heavy (>250K tons /yr):", long_heavy_lanes,"\n")
-cat("\nNumber of medium lanes (600-1000 mi) that are heavy (>250K tons /yr):", medium_heavy_lanes,"\n")
-cat("\nNumber of short lanes (200-600 mi) that are heavy (>250K tons /yr):", short_heavy_lanes,"\n")
+cat("\nNumber of long lanes (1000-3000 mi) that are heavy (>",(HEAVY_LANE_TONS_PER_YEAR/1000),"K tons /yr):", long_heavy_lanes,"\n")
+cat("\nNumber of medium lanes (600-1000 mi) that are heavy (>",(HEAVY_LANE_TONS_PER_YEAR/1000),"K tons /yr):", medium_heavy_lanes,"\n")
+cat("\nNumber of short lanes (200-600 mi) that are heavy (>",(HEAVY_LANE_TONS_PER_YEAR/1000),"K tons /yr):", short_heavy_lanes,"\n")
 
-cat("\nNumber of long lanes (1000-3000 mi)  (>150K tons /yr):", long_lanes,"\n")
-cat("\nNumber of medium lanes (600-1000 mi) (>150K tons /yr):", medium_lanes,"\n")
-cat("\nNumber of short lanes (200-600 mi)   (>150K tons /yr):", short_lanes,"\n")
+cat("\nNumber of long lanes (1000-3000 mi)  (>",(MIN_LANE_TONS_PER_YEAR/1000),"K tons /yr):", long_lanes,"\n")
+cat("\nNumber of medium lanes (600-1000 mi) (>",(MIN_LANE_TONS_PER_YEAR/1000),"K tons /yr):", medium_lanes,"\n")
+cat("\nNumber of short lanes (200-600 mi)   (>",(MIN_LANE_TONS_PER_YEAR/1000),"K tons /yr):", short_lanes,"\n")
 
 total_tons = long_tons + medium_tons + short_tons
-cat("\nFraction of tons on heavy long lanes (1000-3000 mi)  (>150K tons /yr):", (long_heavy_tons*100/total_tons),"% of ", total_tons ," tons/ yr\n")
-cat("\nFraction of tons on long lanes (1000-3000 mi)  (>150K tons /yr):", (long_tons*100/total_tons),"% of ", total_tons ," tons/ yr\n")
-cat("\nFraction of tons on heavy medium lanes (1000-3000 mi)  (>150K tons /yr):", (medium_heavy_tons*100/total_tons),"% of ", total_tons ," tons/ yr\n")
-cat("\nFraction of tons on medium lanes (600-1000 mi) (>150K tons /yr):", (medium_tons*100/total_tons),"% of ", total_tons ," tons/ yr\n")
-cat("\nFraction of tons on heavy short lanes (1000-3000 mi)  (>150K tons /yr):", (short_heavy_tons*100/total_tons),"% of ", total_tons ," tons/ yr\n")
-cat("\nFraction of tons on short lanes (200-600 mi)   (>150K tons /yr):", (short_tons*100/total_tons),"% of ", total_tons ," tons/ yr\n")
+cat("\nFraction of tons on heavy long lanes (1000-3000 mi)  (>",(MIN_LANE_TONS_PER_YEAR/1000),"K tons /yr):", (long_heavy_tons*100/total_tons),"% of ", total_tons ," tons/ yr\n")
+cat("\nFraction of tons on long lanes (1000-3000 mi)  (>",(MIN_LANE_TONS_PER_YEAR/1000),"K tons /yr):", (long_tons*100/total_tons),"% of ", total_tons ," tons/ yr\n")
+cat("\nFraction of tons on heavy medium lanes (1000-3000 mi)  (>",(MIN_LANE_TONS_PER_YEAR/1000),"K tons /yr):", (medium_heavy_tons*100/total_tons),"% of ", total_tons ," tons/ yr\n")
+cat("\nFraction of tons on medium lanes (600-1000 mi) (>",(MIN_LANE_TONS_PER_YEAR/1000),"K tons /yr):", (medium_tons*100/total_tons),"% of ", total_tons ," tons/ yr\n")
+cat("\nFraction of tons on heavy short lanes (1000-3000 mi)  (>",(MIN_LANE_TONS_PER_YEAR/1000),"K tons /yr):", (short_heavy_tons*100/total_tons),"% of ", total_tons ," tons/ yr\n")
+cat("\nFraction of tons on short lanes (200-600 mi)   (>",(MIN_LANE_TONS_PER_YEAR/1000),"K tons /yr):", (short_tons*100/total_tons),"% of ", total_tons ," tons/ yr\n")
 
 total_any_ratio_tons = total_tons + one_way_tons
 cat("\nFraction of tons on balanced lanes :", (total_tons*100/total_any_ratio_tons),"% of ", total_any_ratio_tons ," tons/ yr\n")
