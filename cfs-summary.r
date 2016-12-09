@@ -12,9 +12,9 @@ MAX_WGHT = 15 #15
 
 round_numbers <- function(test) {
 	# round shipment weight to tons
- 	test$SHIPMT_WGHT <- test$SHIPMT_WGHT/LBS_PER_TON
+ 	test$SHIPMT_WGHT <- round(test$SHIPMT_WGHT/LBS_PER_TON)
 	# round routed distance to hundreds of miles
-	test$SHIPMT_DIST_ROUTED <- test$SHIPMT_DIST_ROUTED/100
+	test$SHIPMT_DIST_ROUTED <- round(test$SHIPMT_DIST_ROUTED/100)
 	test
 }
 
@@ -231,7 +231,8 @@ num_distances <- dim(distances)[1]
 	medium_heavy_tons = 0
 	total_distance_lanes = 0
 	total_num_lanes = 0
-	
+	short_nonheavy_remainder_tons = 0
+
 for (distance_type in c(1:num_distances)) { 
 	min_distance <- distances[distance_type,1]
 	max_distance <- distances[distance_type,2]
@@ -269,6 +270,9 @@ for (distance_type in c(1:num_distances)) {
  	#{cat("\n weird lane", origin, " ", dest, " ", ratio, " ", tons_forward, " ", sample_distance)}
  	# {cat(tons_forward, " ", tons_reverse, " ", ratio, "\n")}
  	kind = "na"
+ 	origin <- lane[1, ORIG_CFS_AREA_STR]
+ 	dest <- lane[1, DEST_CFS_AREA_STR]
+
 	if (tons_reverse > 0 & tons_forward > 0) {
  		ratio <- round(tons_reverse*100/tons_forward)
  		if (ratio> BALANCED_LANE_LOWER & ratio< BALANCED_LANE_UPPER) { 
@@ -295,22 +299,23 @@ for (distance_type in c(1:num_distances)) {
  			} else if (is_short_lane(sample_distance)) {
 			        kind = "short"
  				short_lanes = short_lanes + 1
- 				short_tons = short_tons + tons_forward+tons_reverse
+				short_tons = short_tons + tons_forward+tons_reverse
  				if (tons_forward > HEAVY_LANE_TONS_PER_YEAR) {
-				 kind = "short heavy"
- 					short_heavy_lanes = short_heavy_lanes + 1	
- 					short_heavy_tons = short_heavy_tons + tons_forward+tons_reverse
- 					}
+				   kind = "short heavy"			  
+ 				   short_heavy_lanes = short_heavy_lanes + 1	
+ 				   short_heavy_tons = short_heavy_tons + tons_forward+tons_reverse
+ 						    		 } else if (regexpr('Remainder', origin)[1] > 0 || regexpr('Remainder', dest)[1]  > 0) {
+					  short_nonheavy_remainder_tons = short_nonheavy_remainder_tons + tons_forward + tons_reverse
+					}
  				}
- 	origin <- lane[1, ORIG_CFS_AREA_STR]
- 	dest <- lane[1, DEST_CFS_AREA_STR]
  	cat("\n", sample_distance*100, " mi", origin, " ", dest, " ", ratio, "% ", tons_forward, " ", avg_forward, " ", tons_reverse, " ", avg_reverse, " ", sample_distance*100, " mi",  " ", kind)
  	} else {
  		one_way_tons = one_way_tons + tons_forward+tons_reverse
+		}
  	}
   }
  }
-}
+
 
 cat("\nTotal number of lanes ", total_num_lanes, " avg. lane distance ", round(total_distance_lanes/total_num_lanes))
 cat("\nNumber of long lanes (1000-3000 mi) that are heavy (>",(HEAVY_LANE_TONS_PER_YEAR/1000),"K tons /yr):", long_heavy_lanes,"\n")
@@ -321,13 +326,14 @@ cat("\nNumber of long lanes (1000-3000 mi)  (>",(MIN_LANE_TONS_PER_YEAR/1000),"K
 cat("\nNumber of medium lanes (600-1000 mi) (>",(MIN_LANE_TONS_PER_YEAR/1000),"K tons /yr):", medium_lanes,"\n")
 cat("\nNumber of short lanes (200-600 mi)   (>",(MIN_LANE_TONS_PER_YEAR/1000),"K tons /yr):", short_lanes,"\n")
 
-total_tons = long_tons + medium_tons + short_tons
+total_tons = long_tons + medium_tons + short_tons - short_nonheavy_remainder_tons
+
 cat("\nFraction of tons on heavy long lanes (1000-3000 mi)  (>",(MIN_LANE_TONS_PER_YEAR/1000),"K tons /yr):", (long_heavy_tons*100/total_tons),"% of ", total_tons ," tons/ yr\n")
 cat("\nFraction of tons on long lanes (1000-3000 mi)  (>",(MIN_LANE_TONS_PER_YEAR/1000),"K tons /yr):", (long_tons*100/total_tons),"% of ", total_tons ," tons/ yr\n")
 cat("\nFraction of tons on heavy medium lanes (1000-3000 mi)  (>",(MIN_LANE_TONS_PER_YEAR/1000),"K tons /yr):", (medium_heavy_tons*100/total_tons),"% of ", total_tons ," tons/ yr\n")
 cat("\nFraction of tons on medium lanes (600-1000 mi) (>",(MIN_LANE_TONS_PER_YEAR/1000),"K tons /yr):", (medium_tons*100/total_tons),"% of ", total_tons ," tons/ yr\n")
 cat("\nFraction of tons on heavy short lanes (1000-3000 mi)  (>",(MIN_LANE_TONS_PER_YEAR/1000),"K tons /yr):", (short_heavy_tons*100/total_tons),"% of ", total_tons ," tons/ yr\n")
-cat("\nFraction of tons on short lanes (200-600 mi)   (>",(MIN_LANE_TONS_PER_YEAR/1000),"K tons /yr):", (short_tons*100/total_tons),"% of ", total_tons ," tons/ yr\n")
+cat("\nFraction of tons on short lanes (200-600 mi)   (>",(MIN_LANE_TONS_PER_YEAR/1000),"K tons /yr):", ((short_tons-short_nonheavy_remainder_tons)*100/total_tons),"% of ", total_tons ," tons/ yr\n")
 
 total_any_ratio_tons = total_tons + one_way_tons
 cat("\nFraction of tons on balanced lanes :", (total_tons*100/total_any_ratio_tons),"% of ", total_any_ratio_tons ," tons/ yr\n")
